@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g., v1.2.3)"
+        description: "Release version (e.g., v1 or v1.2.3)"
         required: true
         type: string
 
@@ -23,8 +23,8 @@ jobs:
       - name: Validate version
         shell: bash
         run: |
-          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid version. Use vMAJOR.MINOR.PATCH (e.g., v1.2.3)."
+          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+(\.[0-9]+\.[0-9]+)?$ ]]; then
+            echo "Invalid version. Use vMAJOR or vMAJOR.MINOR.PATCH (e.g., v1 or v1.2.3)."
             exit 1
           fi
 
@@ -37,15 +37,20 @@ jobs:
       - name: Create release tag
         shell: bash
         run: |
-          git tag -a "${{ inputs.version }}" -m "Release ${{ inputs.version }}"
-          git push origin "${{ inputs.version }}"
+          git tag -fa "${{ inputs.version }}" -m "Release ${{ inputs.version }}"
+          git push origin -f "${{ inputs.version }}"
 
       - name: Update major tag
         shell: bash
         run: |
-          major_tag=$(echo "${{ inputs.version }}" | sed -E 's/^(v[0-9]+)\..*/\1/')
-          git tag -f "$major_tag" "${{ inputs.version }}"
-          git push origin -f "$major_tag"
+          version="${{ inputs.version }}"
+          if [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            major_tag=$(echo "$version" | sed -E 's/^(v[0-9]+)\..*/\1/')
+            git tag -f "$major_tag" "$version"
+            git push origin -f "$major_tag"
+          else
+            echo "Version is already a major tag ($version), skipping major tag update."
+          fi
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
